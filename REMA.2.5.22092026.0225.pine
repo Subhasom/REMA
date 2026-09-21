@@ -16,8 +16,8 @@
 //               chart: Buy green, Sell red, Short blue, Cover orange (text-free
 //               on the chart). Signals confirm on bar close. Alerts are 
 //               included. Chart candles are recoloured with adjustable
-//               transparency (50% by default). Short signals (SHORT / COVER)
-//               are off by default.
+//               transparency (50% by default). Short and Cover markers are
+//               unchecked in the Style tab by default.
 // ═════════════════════════════════════════════════════════════════════════════
 //@version=6
 indicator(title = "REMA", shorttitle = "REMA", format = format.price, precision = 2, timeframe = "", timeframe_gaps = true)
@@ -26,7 +26,6 @@ indicator(title = "REMA", shorttitle = "REMA", format = format.price, precision 
 len         = input.int(9, "Length", minval = 1)
 src         = input.source(close, "Source")
 showLong    = input.bool(true,  "Show long signals (BUY / SELL)",    group = "Markers")
-showShort   = input.bool(false, "Show short signals (SHORT / COVER)", group = "Markers")
 showOnChart = input.bool(true,  "Also show markers on price chart",   group = "Markers")
 confirmBar  = input.bool(true,  "Confirm signals on bar close",       group = "Markers")
 tintCandles = input.bool(true,  "Transparent chart candles",          group = "Candles")
@@ -71,7 +70,7 @@ if canSignal
     if pos == 0 and bullCond and showLong
         buySig := true
         pos    := 1
-    else if pos == 0 and bearCond and showShort
+    else if pos == 0 and bearCond
         shortSig := true
         pos      := -1
 
@@ -86,14 +85,14 @@ plot(ema3,  "Price",    color = color.green, style = plot.style_line, linewidth 
 // ── Markers in indicator pane ────────────────────────────────────────────────
 plotshape(buySig,   "Buy",   shape.triangleup,   location.bottom, color.new(color.green, 0),  text = "BUY",   textcolor = color.green,  size = size.tiny)
 plotshape(sellSig,  "Sell",  shape.triangledown, location.top,    color.new(color.red, 0),    text = "SELL",  textcolor = color.red,    size = size.tiny)
-plotshape(shortSig, "Short", shape.diamond,      location.top,    color.new(color.blue, 0),   text = "SHORT", textcolor = color.blue,   size = size.tiny)
-plotshape(coverSig, "Cover", shape.circle,       location.bottom, color.new(color.orange, 0), text = "COVER", textcolor = color.orange, size = size.tiny)
+plotshape(shortSig, "Short", shape.diamond,      location.top,    color.new(color.blue, 0),   text = "SHORT", textcolor = color.blue,   size = size.tiny, display = display.none)
+plotshape(coverSig, "Cover", shape.circle,       location.bottom, color.new(color.orange, 0), text = "COVER", textcolor = color.orange, size = size.tiny, display = display.none)
 
 // ── Markers on price chart ───────────────────────────────────────────────────
 plotshape(showOnChart and buySig,   "Buy (chart)",   shape.triangleup,   location.belowbar, color.new(color.green, 0),  size = size.small, force_overlay = true)
 plotshape(showOnChart and sellSig,  "Sell (chart)",  shape.triangledown, location.abovebar, color.new(color.red, 0),    size = size.small, force_overlay = true)
-plotshape(showOnChart and shortSig, "Short (chart)", shape.diamond,      location.abovebar, color.new(color.blue, 0),   size = size.small, force_overlay = true)
-plotshape(showOnChart and coverSig, "Cover (chart)", shape.circle,       location.belowbar, color.new(color.orange, 0), size = size.small, force_overlay = true)
+plotshape(showOnChart and shortSig, "Short (chart)", shape.diamond,      location.abovebar, color.new(color.blue, 0),   size = size.tiny,  force_overlay = true, display = display.none)
+plotshape(showOnChart and coverSig, "Cover (chart)", shape.circle,       location.belowbar, color.new(color.orange, 0), size = size.tiny,  force_overlay = true, display = display.none)
 
 // ── Chart candle transparency ────────────────────────────────────────────────
 barcolor(tintCandles ? color.new(close >= open ? candleUp : candleDn, candleTransp) : na, title = "Candle Colour")
