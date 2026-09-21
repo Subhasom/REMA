@@ -1,0 +1,105 @@
+// ═════════════════════════════════════════════════════════════════════════════
+// Author Name : Subhasom Mandal
+// GitHub      : https://github.com/Subhasom
+// Date        : Tuesday 22nd Sep 2026
+// Release     : 2.5.22092026.0225
+// Description : REMA — an RSI momentum indicator with EMA/WMA confirmation.
+//               It plots an RSI (default length 9) against a 50
+//               midline, shaded red above 50 and aqua below. A 21 WMA of RSI
+//               ("Strength", red) marks the major trend and a 3 EMA of RSI
+//               ("Price", green) shows short-term momentum. Trade markers:
+//               BUY   (long entry)  : RSI > 50, red line below RSI, green > red
+//               SELL  (long exit)   : green crosses under red or RSI < 50
+//               SHORT (short entry) : RSI < 50, red line above RSI, green < red
+//               COVER (short exit)  : green crosses over red or RSI > 50
+//               Markers appear in the pane and, optionally, on the price
+//               chart: Buy green, Sell red, Short blue, Cover orange (text-free
+//               on the chart). Signals confirm on bar close. Alerts are 
+//               included. Chart candles are recoloured with adjustable
+//               transparency (50% by default). Short signals (SHORT / COVER)
+//               are off by default.
+// ═════════════════════════════════════════════════════════════════════════════
+//@version=6
+indicator(title = "REMA", shorttitle = "REMA", format = format.price, precision = 2, timeframe = "", timeframe_gaps = true)
+
+// ── Inputs ───────────────────────────────────────────────────────────────────
+len         = input.int(9, "Length", minval = 1)
+src         = input.source(close, "Source")
+showLong    = input.bool(true,  "Show long signals (BUY / SELL)",    group = "Markers")
+showShort   = input.bool(false, "Show short signals (SHORT / COVER)", group = "Markers")
+showOnChart = input.bool(true,  "Also show markers on price chart",   group = "Markers")
+confirmBar  = input.bool(true,  "Confirm signals on bar close",       group = "Markers")
+tintCandles = input.bool(true,  "Transparent chart candles",          group = "Candles")
+candleUp    = input.color(#089981, "Up candle",                       group = "Candles")
+candleDn    = input.color(#F23645, "Down candle",                     group = "Candles")
+candleTransp = input.int(50, "Transparency %", minval = 0, maxval = 100, group = "Candles")
+
+// ── Calculations ─────────────────────────────────────────────────────────────
+rsiValue = ta.rsi(src, len)
+wma21    = ta.wma(rsiValue, 21)
+ema3     = ta.ema(rsiValue, 3)
+
+// Trend conditions
+bullCond = rsiValue > 50 and wma21 < rsiValue and ema3 > wma21
+bearCond = rsiValue < 50 and wma21 > rsiValue and ema3 < wma21
+
+// Crosses computed every bar for consistency
+emaCrossDown = ta.crossunder(ema3, wma21)
+emaCrossUp   = ta.crossover(ema3, wma21)
+rsiCrossDown = ta.crossunder(rsiValue, 50)
+rsiCrossUp   = ta.crossover(rsiValue, 50)
+
+// ── Position state machine ───────────────────────────────────────────────────
+// pos: 1 = long, -1 = short, 0 = flat
+var int pos = 0
+buySig   = false
+sellSig  = false
+shortSig = false
+coverSig = false
+
+canSignal = not confirmBar or barstate.isconfirmed
+
+if canSignal
+    // Exits first
+    if pos == 1 and (emaCrossDown or rsiCrossDown)
+        sellSig := true
+        pos     := 0
+    if pos == -1 and (emaCrossUp or rsiCrossUp)
+        coverSig := true
+        pos      := 0
+    // Entries
+    if pos == 0 and bullCond and showLong
+        buySig := true
+        pos    := 1
+    else if pos == 0 and bearCond and showShort
+        shortSig := true
+        pos      := -1
+
+// ── Plots ────────────────────────────────────────────────────────────────────
+h50  = plot(50, "Line -50", color = color.green, style = plot.style_line, linewidth = 1)
+pRsi = plot(rsiValue, "RSI - Plot", color = color.black, style = plot.style_line, linewidth = 2)
+fill(pRsi, h50, color = color.new(rsiValue > 50 ? color.red : color.aqua, 50), title = "RSI Fill")
+
+plot(wma21, "Strength", color = color.red,   style = plot.style_line, linewidth = 2)
+plot(ema3,  "Price",    color = color.green, style = plot.style_line, linewidth = 2)
+
+// ── Markers in indicator pane ────────────────────────────────────────────────
+plotshape(buySig,   "Buy",   shape.triangleup,   location.bottom, color.new(color.green, 0),  text = "BUY",   textcolor = color.green,  size = size.tiny)
+plotshape(sellSig,  "Sell",  shape.triangledown, location.top,    color.new(color.red, 0),    text = "SELL",  textcolor = color.red,    size = size.tiny)
+plotshape(shortSig, "Short", shape.diamond,      location.top,    color.new(color.blue, 0),   text = "SHORT", textcolor = color.blue,   size = size.tiny)
+plotshape(coverSig, "Cover", shape.circle,       location.bottom, color.new(color.orange, 0), text = "COVER", textcolor = color.orange, size = size.tiny)
+
+// ── Markers on price chart ───────────────────────────────────────────────────
+plotshape(showOnChart and buySig,   "Buy (chart)",   shape.triangleup,   location.belowbar, color.new(color.green, 0),  size = size.small, force_overlay = true)
+plotshape(showOnChart and sellSig,  "Sell (chart)",  shape.triangledown, location.abovebar, color.new(color.red, 0),    size = size.small, force_overlay = true)
+plotshape(showOnChart and shortSig, "Short (chart)", shape.diamond,      location.abovebar, color.new(color.blue, 0),   size = size.small, force_overlay = true)
+plotshape(showOnChart and coverSig, "Cover (chart)", shape.circle,       location.belowbar, color.new(color.orange, 0), size = size.small, force_overlay = true)
+
+// ── Chart candle transparency ────────────────────────────────────────────────
+barcolor(tintCandles ? color.new(close >= open ? candleUp : candleDn, candleTransp) : na, title = "Candle Colour")
+
+// ── Alerts ───────────────────────────────────────────────────────────────────
+alertcondition(buySig,   "Buy",   "REMA ▲ Buy on {{ticker}} at {{close}}")
+alertcondition(sellSig,  "Sell",  "REMA ▼ Sell on {{ticker}} at {{close}}")
+alertcondition(shortSig, "Short", "REMA ◆ Short on {{ticker}} at {{close}}")
+alertcondition(coverSig, "Cover", "REMA ● Cover on {{ticker}} at {{close}}")
